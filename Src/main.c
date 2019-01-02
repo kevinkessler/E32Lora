@@ -124,7 +124,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   RetargetInit(&huart2);
   printf("\r\nHere we go\r\n");
-  E32_Init(&huart1);
+  E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
   while (1)
   {
 	  E32_Poll();
