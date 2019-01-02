@@ -63,8 +63,9 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 	else if (status != HAL_OK)
 		return E32_ERROR;
 
-	if ((error = E32_ConfigResponse(response, responseLength)) != E32_OK)
-		return error;
+	if(response != NULL)
+		if ((error = E32_ConfigResponse(response, responseLength)) != E32_OK)
+			return error;
 
 	if ((error = E32_SetMode(origMode)) != E32_OK)
 		return error;
@@ -114,13 +115,53 @@ uint8_t E32_GetMode()
 			(HAL_GPIO_ReadPin(m0Port, m0Pin));
 }
 
-uint8_t E32_GetConfig(uint8_t *configBuffer)
+E32_STATUS E32_GetConfig(uint8_t *configBuffer)
 {
 	uint8_t message[]={0xc1, 0xc1, 0xc1 };
 
 	return E32_ConfigRequest(message, 3, configBuffer, 6);
 }
 
+E32_STATUS E32_GetVersion(uint8_t *configBuffer)
+{
+	uint8_t message[]={0xc3, 0xc3, 0xc3 };
+
+	return E32_ConfigRequest(message, 3, configBuffer, 6);
+}
+
+E32_STATUS E32_Reset()
+{
+	uint8_t message[] = {0xc4, 0xc4, 0xc4};
+	E32_STATUS error;
+
+	if((error = E32_ConfigRequest(message,3,NULL,0)) != E32_OK)
+		return error;
+
+	if ((error=E32_WaitForAux(1)) != E32_OK)
+		return error;
+
+	if ((error=E32_WaitForAux(0)) != E32_OK)
+		return error;
+
+	if((error = E32_SetMode(NORMAL_MODE)) != E32_OK)
+		return error;
+
+	return E32_OK;
+}
+
+E32_STATUS E32_SaveParams()
+{
+	uint8_t config[6];
+	E32_STATUS error;
+
+	if((error=E32_GetConfig(config)) != E32_OK)
+		return error;
+
+	if((error=E32_ConfigRequest(config,6,NULL,0))!=E32_OK)
+		return error;
+
+	return E32_OK;
+}
 
 void E32_Poll()
 {
@@ -131,6 +172,8 @@ void E32_Poll()
 	  printf("============\r\n");
 	  printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
 
+	  status = E32_Reset();
+	  printf("Reset %x\r\n",status);
 	  //E32_SetMode(3);
 	  //uint8_t send[] = {0xc1,0xc1,0xc1};
 	  //HAL_UART_Transmit(huart, send, 3, 2000);
