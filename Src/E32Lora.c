@@ -183,8 +183,8 @@ E32_STATUS E32_SetUartBaud(enum uartBaud baud)
 void E32_Poll()
 {
 
-	enum uartBaud b = B9600;
-	E32_SetUartBaud(b);
+
+	E32_SetUartBaud(B9600);
 	  uint8_t recv[] = {0x01,0x02,0x03,0x04,0x05,0x06};
 	  printf("----------\r\n");
 	  E32_STATUS status= E32_GetConfig(recv);
