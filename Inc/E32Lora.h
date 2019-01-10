@@ -19,7 +19,16 @@
 #define E32_ERROR 100
 
 typedef uint8_t E32_STATUS;
-
+enum uartBaud {
+	B1200 = 0,
+	B2400 = 1,
+	B4800 = 2,
+	B9600 = 3,
+	B19200 = 4,
+	B38400 = 5,
+	B57600 = 6,
+	B115200 = 7
+};
 E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, uint16_t pinM1,
 		GPIO_TypeDef* portAux, uint16_t pinAux, UART_HandleTypeDef *h);
 E32_STATUS E32_SetMode(uint8_t mode);

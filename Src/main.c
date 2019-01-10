@@ -40,7 +40,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32l4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -117,19 +116,22 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  RetargetInit(&huart2);
+  printf("\r\nHere we go\r\n");
+  E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  RetargetInit(&huart2);
-  printf("\r\nHere we go\r\n");
-  E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
   while (1)
   {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
 	  E32_Poll();
-	  HAL_Delay(1000);
+	  HAL_Delay(10000);
   }
+  /* USER CODE END 3 */
 }
 
 /**
@@ -280,6 +282,9 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(D2_GPIO_Port, D2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD3_Pin|M1_Pin|M0_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : AUX_Pin */
@@ -287,6 +292,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(AUX_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : D2_Pin */
+  GPIO_InitStruct.Pin = D2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(D2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD3_Pin M1_Pin M0_Pin */
   GPIO_InitStruct.Pin = LD3_Pin|M1_Pin|M0_Pin;
