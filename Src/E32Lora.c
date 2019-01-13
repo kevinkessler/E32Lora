@@ -292,23 +292,6 @@ E32_STATUS E32_SetTransmissionMode(enum txMode mode)
 	return E32_OK;
 }
 
-E32_STATUS E32_SetIOnMode(enum ioMode mode)
-{
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
-
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
-
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0xBF) | mode << 6;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
-
-	return E32_OK;
-}
-
 E32_STATUS E32_SetIOMode(enum ioMode mode)
 {
 	uint8_t config[6], resp[6];

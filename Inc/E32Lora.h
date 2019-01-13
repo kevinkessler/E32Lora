@@ -94,7 +94,6 @@ E32_STATUS E32_SetUartBaud(enum uartBaud baud);
 E32_STATUS E32_SetAirRate(enum airRate rate);
 E32_STATUS E32_SetChannel(uint8_t channel);
 E32_STATUS E32_SetTransmissionMode(enum txMode mode);
-E32_STATUS E32_SetIOnMode(enum ioMode mode);
 E32_STATUS E32_SetIOMode(enum ioMode mode);
 E32_STATUS E32_SetWakeTime(enum wakeupTime wake);
 E32_STATUS E32_SetFECSwitch(enum fecSwitch fec);
