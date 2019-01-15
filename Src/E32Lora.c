@@ -82,7 +82,7 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 }
 
 static uint32_t E32_GetBaud() {
-	return baudRateList[(currentConfig[3] & 0xC7) >> 3];
+	return baudRateList[(currentConfig[3] & 0x38) >> 3];
 }
 
 E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, uint16_t pinM1,
@@ -373,7 +373,7 @@ E32_STATUS E32_Transmit(uint8_t *message, uint16_t length) {
 	if (length > 512)
 		return E32_MESSAGE_TOO_LONG;
 
-	if (currentConfig[5] & 0x7F) {
+	if (currentConfig[5] & 0x80) {
 		if(length > 509)
 			return E32_MESSAGE_TOO_LONG;
 		uint8_t header[3 + length];

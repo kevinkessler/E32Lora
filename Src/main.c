@@ -119,6 +119,16 @@ int main(void)
   RetargetInit(&huart2);
   printf("\r\nHere we go\r\n");
   E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
+	E32_SetUartBaud(Baud_9600);
+
+	E32_SetTransmissionMode(TxMode_Fixed);
+	E32_SetAirRate(AirRate_2400);
+	E32_SetTargetAddress(0x01);
+	E32_SetTargetChannel(0xf);
+
+	uint8_t recv[6];
+	E32_STATUS status=E32_GetConfig(recv);
+	printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -128,8 +138,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  E32_Poll();
-	  HAL_Delay(10000);
+	  uint8_t mes[] = {1,2,3};
+	  status = E32_Transmit(mes,3);
+	  printf("Status -> %d\r\n",status);
+		//uint8_t recv[6];
+		//E32_STATUS status=E32_GetConfig(recv);
+		//printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
+		 //status = E32_Reset();
+		 //printf("Reset %x\r\n",status);
+
+	  HAL_Delay(2000);
   }
   /* USER CODE END 3 */
 }
