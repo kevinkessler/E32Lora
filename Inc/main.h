@@ -84,6 +84,7 @@ void Error_Handler(void);
 #define VCP_TX_GPIO_Port GPIOA
 #define AUX_Pin GPIO_PIN_11
 #define AUX_GPIO_Port GPIOA
+#define AUX_EXTI_IRQn EXTI15_10_IRQn
 #define D2_Pin GPIO_PIN_12
 #define D2_GPIO_Port GPIOA
 #define SWDIO_Pin GPIO_PIN_13

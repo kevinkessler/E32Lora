@@ -101,6 +101,8 @@ E32_STATUS E32_SetTXPower(enum txPower power);
 E32_STATUS E32_SetTargetChannel(uint8_t channel);
 E32_STATUS E32_SetTargetAddress(uint8_t addr);
 E32_STATUS E32_Transmit(uint8_t *message, uint16_t length);
+uint16_t E32_ReceiveData(uint8_t *buffer, uint16_t bufferLength);
+uint8_t E32_DataAvailable(void);
 
 void E32_Poll(void);
 

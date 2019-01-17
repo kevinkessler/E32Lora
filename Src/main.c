@@ -119,16 +119,19 @@ int main(void)
   RetargetInit(&huart2);
   printf("\r\nHere we go\r\n");
   E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
-	E32_SetUartBaud(Baud_9600);
+//	E32_SetUartBaud(Baud_9600);
+//	E32_SetAddress(0x02);
+//	E32_SetChannel(0x0f);
+//	E32_SaveParams();
+//	E32_Reset();
+//	E32_SetTransmissionMode(TxMode_Fixed);
+//	E32_SetAirRate(AirRate_2400);
+//	E32_SetTargetAddress(0x01);
+//	E32_SetTargetChannel(0xf);
 
-	E32_SetTransmissionMode(TxMode_Fixed);
-	E32_SetAirRate(AirRate_2400);
-	E32_SetTargetAddress(0x01);
-	E32_SetTargetChannel(0xf);
-
-	uint8_t recv[6];
-	E32_STATUS status=E32_GetConfig(recv);
-	printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
+//	uint8_t recv[6];
+//	E32_STATUS status=E32_GetConfig(recv);
+//	printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -138,16 +141,24 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  uint8_t mes[] = {1,2,3};
-	  status = E32_Transmit(mes,3);
-	  printf("Status -> %d\r\n",status);
-		//uint8_t recv[6];
-		//E32_STATUS status=E32_GetConfig(recv);
-		//printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
+	  uint8_t mes[257];
+//	  E32_SetMode(NORMAL_MODE);
+//	  for (uint16_t n=0;n<256;n++)
+//		  mes[n]=n;
+
+//	  status = E32_Transmit(mes,60);
+//	  printf("Status -> %d\r\n",status);
+//		uint8_t recv[6];
+//		E32_STATUS status=E32_GetConfig(recv);
+//		printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
 		 //status = E32_Reset();
 		 //printf("Reset %x\r\n",status);
-
-	  HAL_Delay(2000);
+	  if(E32_DataAvailable())
+	  {
+		  uint16_t length=E32_ReceiveData(mes,256);
+		  printf("%d\r\n",length);
+	  }
+//	  HAL_Delay(2000);
   }
   /* USER CODE END 3 */
 }
@@ -307,7 +318,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : AUX_Pin */
   GPIO_InitStruct.Pin = AUX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(AUX_GPIO_Port, &GPIO_InitStruct);
 
@@ -324,6 +335,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 

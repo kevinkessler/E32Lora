@@ -11,23 +11,25 @@
 #include <string.h>
 #include "stm32l432xx.h"
 
-static UART_HandleTypeDef *huart;
-static GPIO_TypeDef* m0Port;
-static uint16_t m0Pin;
-static GPIO_TypeDef* m1Port;
-static uint16_t m1Pin;
-static GPIO_TypeDef* auxPort;
-static uint16_t auxPin;
-static uint32_t baudRateList[] = {1200,2400,4800,9600,19200,38400,57600,115200};
-static uint8_t targetChannel;
-static uint16_t targetAddress;
-static uint8_t currentConfig[6];
+static UART_HandleTypeDef *_huart;
+static GPIO_TypeDef* _m0Port;
+static uint16_t _m0Pin;
+static GPIO_TypeDef* _m1Port;
+static uint16_t _m1Pin;
+static GPIO_TypeDef* _auxPort;
+static uint16_t _auxPin;
+static uint32_t _baudRateList[] = {1200,2400,4800,9600,19200,38400,57600,115200};
+static uint8_t _targetChannel;
+static uint16_t _targetAddress;
+static uint8_t _currentConfig[] = {0xff,0xff,0xff,0xff,0xff,0xff};
+volatile uint8_t _dataAvailable = 0;
+uint8_t _disableAuxIrq = 0;
 
 static E32_STATUS E32_WaitForAux(uint8_t state)
 {
 
 	uint16_t count = 0;
-	while(HAL_GPIO_ReadPin(auxPort, auxPin) != state)
+	while(HAL_GPIO_ReadPin(_auxPort, _auxPin) != state)
 	{
 		if (count++ > 2500)
 			return E32_TIMEOUT;
@@ -35,6 +37,7 @@ static E32_STATUS E32_WaitForAux(uint8_t state)
 		HAL_Delay(1);
 	}
 
+	_dataAvailable = 0;
 	return E32_OK;
 }
 
@@ -45,7 +48,7 @@ static E32_STATUS E32_ConfigResponse(uint8_t *response, uint8_t responseLength)
 		return error;
 
 	HAL_GPIO_TogglePin(D2_GPIO_Port, D2_Pin);
-	HAL_StatusTypeDef status = HAL_UART_Receive(huart, response, responseLength, 2000);
+	HAL_StatusTypeDef status = HAL_UART_Receive(_huart, response, responseLength, 2000);
 	if (status == HAL_TIMEOUT)
 		return E32_TIMEOUT;
 	else if (status != HAL_OK)
@@ -63,7 +66,8 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
 		return error;
 
-	uint8_t status = HAL_UART_Transmit(huart, request, requestLength, 2000);
+
+	uint8_t status = HAL_UART_Transmit(_huart, request, requestLength, 2000);
 
 	if (status == HAL_TIMEOUT)
 		return E32_TIMEOUT;
@@ -82,25 +86,26 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 }
 
 static uint32_t E32_GetBaud() {
-	return baudRateList[(currentConfig[3] & 0x38) >> 3];
+	return _baudRateList[(_currentConfig[3] & 0x38) >> 3];
 }
 
 E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, uint16_t pinM1,
 		GPIO_TypeDef* portAux, uint16_t pinAux, UART_HandleTypeDef *h)
 {
-	huart = h;
+	_huart = h;
 
-	m0Port = portM0;
-	m0Pin = pinM0;
+	_m0Port = portM0;
+	_m0Pin = pinM0;
 
-	m1Port = portM1;
-	m1Pin = pinM1;
+	_m1Port = portM1;
+	_m1Pin = pinM1;
 
-	auxPort = portAux;
-	auxPin = pinAux;
+	_auxPort = portAux;
+	_auxPin = pinAux;
 
 	E32_STATUS error;
 	uint8_t dummy[6];
+
 	if((error = E32_GetConfig(dummy)) != E32_OK)
 		return error;
 
@@ -109,33 +114,36 @@ E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, 
 
 E32_STATUS E32_SetMode(uint8_t mode)
 {
+
 	if (mode == E32_GetMode())
 			return E32_OK;
 
+	_disableAuxIrq = 1;
 	if (E32_WaitForAux(1) != E32_OK)
 		return E32_ERROR;
 
-	HAL_GPIO_WritePin(m0Port, m0Pin, (mode & 1));
-	HAL_GPIO_WritePin(m1Port, m1Pin, (mode & 2));
+	HAL_GPIO_WritePin(_m0Port, _m0Pin, (mode & 1));
+	HAL_GPIO_WritePin(_m1Port, _m1Pin, (mode & 2));
 
 	if (E32_WaitForAux(1) != E32_OK)
 		return E32_ERROR;
 
 	if (mode == SLEEP_MODE)
-		huart->Init.BaudRate = 9600;
-	else
-		huart->Init.BaudRate = E32_GetBaud();
+		_huart->Init.BaudRate = 9600;
+	else if (_currentConfig[0] != 0xff)
+		_huart->Init.BaudRate = E32_GetBaud();
 
-	HAL_UART_Init(huart);
+	HAL_UART_Init(_huart);
 	HAL_Delay(50);
 
+	_disableAuxIrq = 0;
 	return E32_OK;
 }
 
 uint8_t E32_GetMode()
 {
-	return (HAL_GPIO_ReadPin(m1Port, m1Pin) << 1) |
-			(HAL_GPIO_ReadPin(m0Port, m0Pin));
+	return (HAL_GPIO_ReadPin(_m1Port, _m1Pin) << 1) |
+			(HAL_GPIO_ReadPin(_m0Port, _m0Pin));
 }
 
 E32_STATUS E32_GetConfig(uint8_t *configBuffer)
@@ -144,7 +152,7 @@ E32_STATUS E32_GetConfig(uint8_t *configBuffer)
 
 	E32_STATUS retval = E32_ConfigRequest(message, 3, configBuffer, 6);
 	if (retval == E32_OK)
-		memcpy(currentConfig, configBuffer, 6);
+		memcpy(_currentConfig, configBuffer, 6);
 
 	return retval;
 }
@@ -358,13 +366,13 @@ E32_STATUS E32_SetTXPower(enum txPower power) {
 }
 
 E32_STATUS E32_SetTargetChannel(uint8_t channel) {
-	targetChannel = channel & 0x1F;
+	_targetChannel = channel & 0x1F;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetTargetAddress(uint8_t addr) {
-	targetAddress = addr;
+	_targetAddress = addr;
 
 	return E32_OK;
 }
@@ -373,22 +381,37 @@ E32_STATUS E32_Transmit(uint8_t *message, uint16_t length) {
 	if (length > 512)
 		return E32_MESSAGE_TOO_LONG;
 
-	if (currentConfig[5] & 0x80) {
+	if (_currentConfig[5] & 0x80) {
 		if(length > 509)
 			return E32_MESSAGE_TOO_LONG;
 		uint8_t header[3 + length];
-		header[0] = (targetAddress & 0xFF) >> 8;
-		header[1] = targetAddress &0xff;
-		header[2] = targetChannel;
+		header[0] = (_targetAddress & 0xFF) >> 8;
+		header[1] = _targetAddress &0xff;
+		header[2] = _targetChannel;
 		memcpy(&header[3],message,length);
-		if(HAL_UART_Transmit(huart, header, length+3, 2000) != HAL_OK)
+		if(HAL_UART_Transmit(_huart, header, length+3, 2000) != HAL_OK)
 			return E32_ERROR;
 	}
 	else
-		if(HAL_UART_Transmit(huart, message, length, 2000) != HAL_OK)
+		if(HAL_UART_Transmit(_huart, message, length, 2000) != HAL_OK)
 			return E32_ERROR;
 
 	return E32_OK;
+}
+
+uint16_t E32_ReceiveData(uint8_t *buffer, uint16_t bufferLength) {
+	_dataAvailable = 0;
+	uint16_t idx = -1;
+	while(HAL_UART_Receive(_huart, &buffer[++idx], 1, 2000)==HAL_OK) {
+		if (idx==bufferLength)
+			break;
+	}
+
+	return idx - 1;
+}
+
+uint8_t E32_DataAvailable(void) {
+	return _dataAvailable;
 }
 
 void E32_Poll()
@@ -411,4 +434,12 @@ void E32_Poll()
 	  //E32_STATUS status2 = E32_ConfigResponse(recv,6);
 	  //printf(">>>%x - %x %x %x %x %x %x\r\n",status2,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
 
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	printf("%d\r\n",_disableAuxIrq);
+	if ((GPIO_Pin == AUX_Pin) & (!_disableAuxIrq)) {
+		printf("irq\r\n");
+		_dataAvailable=1;
+	}
 }
