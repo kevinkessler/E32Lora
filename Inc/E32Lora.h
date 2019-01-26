@@ -84,6 +84,7 @@ E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, 
 		GPIO_TypeDef* portAux, uint16_t pinAux, UART_HandleTypeDef *h);
 E32_STATUS E32_SetMode(uint8_t mode);
 uint8_t E32_GetMode(void);
+E32_STATUS E32_SetConfig(uint8_t *configBuffer);
 E32_STATUS E32_GetConfig(uint8_t *configBuffer);
 E32_STATUS E32_GetVersion(uint8_t *configBuffer);
 E32_STATUS E32_Reset(void);

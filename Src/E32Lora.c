@@ -66,7 +66,7 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
 		return error;
 
-
+	printf("Transmitting\r\n");
 	uint8_t status = HAL_UART_Transmit(_huart, request, requestLength, 2000);
 
 	if (status == HAL_TIMEOUT)
@@ -106,27 +106,43 @@ E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, 
 	E32_STATUS error;
 	uint8_t dummy[6];
 
-	if((error = E32_GetConfig(dummy)) != E32_OK)
-		return error;
+//	if((error = E32_GetConfig(dummy)) != E32_OK)
+//		return error;
 
 	return E32_SetMode(NORMAL_MODE);
 }
 
+E32_STATUS E32_SetConfig(uint8_t *config) {
+	E32_STATUS status;
+
+	if((status=E32_ConfigRequest(config,6,NULL,0))!=E32_OK) {
+		printf("ConfigRequest Error");
+		return status;
+	}
+
+	return status;
+
+}
 E32_STATUS E32_SetMode(uint8_t mode)
 {
 
-	if (mode == E32_GetMode())
+	uint8_t prevMode = E32_GetMode();
+	if (mode == prevMode)
 			return E32_OK;
 
 	_disableAuxIrq = 1;
-	if (E32_WaitForAux(1) != E32_OK)
+	if (E32_WaitForAux(1) != E32_OK) {
 		return E32_ERROR;
+	}
 
 	HAL_GPIO_WritePin(_m0Port, _m0Pin, (mode & 1));
 	HAL_GPIO_WritePin(_m1Port, _m1Pin, (mode & 2));
 
-	if (E32_WaitForAux(1) != E32_OK)
+	// Got to delay to catch the falling edge and then wait for rise again
+	HAL_Delay(2);
+	if (E32_WaitForAux(1) != E32_OK) {
 		return E32_ERROR;
+	}
 
 	if (mode == SLEEP_MODE)
 		_huart->Init.BaudRate = 9600;
@@ -134,7 +150,12 @@ E32_STATUS E32_SetMode(uint8_t mode)
 		_huart->Init.BaudRate = E32_GetBaud();
 
 	HAL_UART_Init(_huart);
-	HAL_Delay(50);
+
+	//Wake up needs a 200ms delay before things start to work
+	if(prevMode == SLEEP_MODE)
+		HAL_Delay(200);
+	else
+		HAL_Delay(50);
 
 	_disableAuxIrq = 0;
 	return E32_OK;
@@ -402,11 +423,14 @@ E32_STATUS E32_Transmit(uint8_t *message, uint16_t length) {
 uint16_t E32_ReceiveData(uint8_t *buffer, uint16_t bufferLength) {
 	_dataAvailable = 0;
 	uint16_t idx = -1;
-	while(HAL_UART_Receive(_huart, &buffer[++idx], 1, 2000)==HAL_OK) {
+	uint8_t status;
+	printf("baud %ld\r\n",_huart->Init.BaudRate);
+	while((status=HAL_UART_Receive(_huart, &buffer[++idx], 1, 100))==HAL_OK) {
 		if (idx==bufferLength)
 			break;
 	}
 
+	printf("Status %d idx %d \r\n",status,idx);
 	return idx - 1;
 }
 
@@ -437,9 +461,9 @@ void E32_Poll()
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	printf("%d\r\n",_disableAuxIrq);
+//	printf("i %d\r\n",_disableAuxIrq);
 	if ((GPIO_Pin == AUX_Pin) & (!_disableAuxIrq)) {
-		printf("irq\r\n");
+//		printf("irq\r\n");
 		_dataAvailable=1;
 	}
 }
