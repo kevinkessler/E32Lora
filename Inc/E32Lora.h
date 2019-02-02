@@ -13,6 +13,7 @@
 #define WAKEUP_MODE 2
 #define POWERSAVING_MODE 1
 #define SLEEP_MODE 3
+#define CONFIG_MODE 7
 
 #define E32_OK 0
 #define E32_TIMEOUT 1

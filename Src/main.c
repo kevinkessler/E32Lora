@@ -119,19 +119,21 @@ int main(void)
   RetargetInit(&huart2);
   printf("\r\nHere we go\r\n");
   E32_Init(M0_GPIO_Port, M0_Pin, M1_GPIO_Port, M1_Pin, AUX_GPIO_Port, AUX_Pin, &huart1);
-//	E32_SetUartBaud(Baud_9600);
-//	E32_SetAddress(0x02);
-//	E32_SetChannel(0x0f);
-//	E32_SetTransmissionMode(TxMode_Fixed);
-//	E32_SaveParams();
-//	E32_Reset();
+  E32_SetMode(CONFIG_MODE);
+	E32_SetUartBaud(Baud_9600);
+	E32_SetAddress(0x02);
+	E32_SetChannel(0x0f);
+	E32_SetTransmissionMode(TxMode_Fixed);
+	E32_SaveParams();
+	E32_SetMode(NORMAL_MODE);
+	E32_Reset();
 
 //	E32_SetAirRate(AirRate_2400);
 //	E32_SetTargetAddress(0x01);
 //	E32_SetTargetChannel(0xf);
 //	uint8_t config[]={0xc0,0x00,0x02,0x1a,0x0f,0xc4};
 //	E32_SetConfig(config);
-//	uint8_t recv[6];
+	uint8_t recv[6];
 //	E32_STATUS status=E32_GetConfig(recv);
 //	printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
   uint32_t curTime = HAL_GetTick();
@@ -155,7 +157,17 @@ int main(void)
 		  }
 		  else {
 			  state = 0;
-			  E32_SetMode(SLEEP_MODE);
+//			  uint8_t recv[6];
+
+			  E32_STATUS status=E32_GetConfig(recv);
+		      printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
+		      E32_SetMode(CONFIG_MODE);
+				E32_SetUartBaud(Baud_9600);
+				E32_SetAddress(0x02);
+//				E32_SetChannel(0x0f);
+//				E32_SetTransmissionMode(TxMode_Fixed);
+				E32_SetParams();
+				//E32_SetMode(NORMAL_MODE);
 			  printf("Sleeping\r\n");
 		  }
 		  curTime=HAL_GetTick();

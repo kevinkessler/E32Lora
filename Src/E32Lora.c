@@ -99,14 +99,20 @@ E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, 
 }
 
 E32_STATUS E32_SetConfig(uint8_t *config) {
-	E32_STATUS status;
+	E32_STATUS error;
 
-	if((status=E32_ConfigRequest(config,6,NULL,0))!=E32_OK) {
-		printf("ConfigRequest Error");
-		return status;
+	uint8_t origMode = E32_GetMode();
+	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
+		return error;
+
+	if((error=E32_ConfigRequest(config,6,NULL,0))!=E32_OK) {
+		return error;
 	}
 
-	return status;
+	if ((error = E32_SetMode(origMode)) != E32_OK)
+		return error;
+
+	return error;
 
 }
 E32_STATUS E32_SetMode(uint8_t mode)
@@ -139,13 +145,15 @@ E32_STATUS E32_SetMode(uint8_t mode)
 
 	//Wake up needs a 200ms delay before things start to work
 	if(prevMode == SLEEP_MODE) {
-		HAL_Delay(200);
+		HAL_Delay(250);
 		_disableAuxIrq=0;
 	}
-	else if(mode==SLEEP_MODE) {
-		E32_STATUS error;
-		if((error=E32_GetConfig(_currentConfig)) != E32_OK)
+	else if(mode==CONFIG_MODE) {
+		uint8_t message[]={0xc1, 0xc1, 0xc1 };
+		E32_STATUS error = E32_ConfigRequest(message, 3, _currentConfig, 6);
+		if(error != E32_OK)
 			return error;
+		_disableAuxIrq = 1;
 	}
 	else {
 		HAL_Delay(50);
@@ -170,7 +178,7 @@ E32_STATUS E32_GetConfig(uint8_t *configBuffer)
 	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
 		return error;
 	error = E32_ConfigRequest(message, 3, configBuffer, 6);
-
+	memcpy(_currentConfig,configBuffer,6);
 	if ((error = E32_SetMode(origMode)) != E32_OK)
 		return error;
 
