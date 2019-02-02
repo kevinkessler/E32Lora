@@ -62,11 +62,6 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 {
 	E32_STATUS error;
 
-	uint8_t origMode = E32_GetMode();
-	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
-		return error;
-
-	printf("Transmitting\r\n");
 	uint8_t status = HAL_UART_Transmit(_huart, request, requestLength, 2000);
 
 	if (status == HAL_TIMEOUT)
@@ -78,16 +73,13 @@ static E32_STATUS E32_ConfigRequest(uint8_t *request, uint8_t requestLength,
 		if ((error = E32_ConfigResponse(response, responseLength)) != E32_OK)
 			return error;
 
-
-	if ((error = E32_SetMode(origMode)) != E32_OK)
-		return error;
-
 	return E32_OK;
 }
 
 static uint32_t E32_GetBaud() {
 	return _baudRateList[(_currentConfig[3] & 0x38) >> 3];
 }
+
 
 E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, uint16_t pinM1,
 		GPIO_TypeDef* portAux, uint16_t pinAux, UART_HandleTypeDef *h)
@@ -102,12 +94,6 @@ E32_STATUS E32_Init(GPIO_TypeDef* portM0, uint16_t pinM0, GPIO_TypeDef* portM1, 
 
 	_auxPort = portAux;
 	_auxPin = pinAux;
-
-	E32_STATUS error;
-	uint8_t dummy[6];
-
-//	if((error = E32_GetConfig(dummy)) != E32_OK)
-//		return error;
 
 	return E32_SetMode(NORMAL_MODE);
 }
@@ -152,12 +138,20 @@ E32_STATUS E32_SetMode(uint8_t mode)
 	HAL_UART_Init(_huart);
 
 	//Wake up needs a 200ms delay before things start to work
-	if(prevMode == SLEEP_MODE)
+	if(prevMode == SLEEP_MODE) {
 		HAL_Delay(200);
-	else
+		_disableAuxIrq=0;
+	}
+	else if(mode==SLEEP_MODE) {
+		E32_STATUS error;
+		if((error=E32_GetConfig(_currentConfig)) != E32_OK)
+			return error;
+	}
+	else {
 		HAL_Delay(50);
+		_disableAuxIrq = 0;
+	}
 
-	_disableAuxIrq = 0;
 	return E32_OK;
 }
 
@@ -170,25 +164,43 @@ uint8_t E32_GetMode()
 E32_STATUS E32_GetConfig(uint8_t *configBuffer)
 {
 	uint8_t message[]={0xc1, 0xc1, 0xc1 };
+	E32_STATUS error;
 
-	E32_STATUS retval = E32_ConfigRequest(message, 3, configBuffer, 6);
-	if (retval == E32_OK)
-		memcpy(_currentConfig, configBuffer, 6);
+	uint8_t origMode = E32_GetMode();
+	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
+		return error;
+	error = E32_ConfigRequest(message, 3, configBuffer, 6);
 
-	return retval;
+	if ((error = E32_SetMode(origMode)) != E32_OK)
+		return error;
+
+	return E32_OK;
 }
 
-E32_STATUS E32_GetVersion(uint8_t *configBuffer)
+E32_STATUS E32_GetVersion(uint8_t *versionBuffer)
 {
 	uint8_t message[]={0xc3, 0xc3, 0xc3 };
+	E32_STATUS error;
 
-	return E32_ConfigRequest(message, 3, configBuffer, 6);
+	uint8_t origMode = E32_GetMode();
+	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
+		return error;
+
+	error = E32_ConfigRequest(message, 3, versionBuffer, 6);
+
+	if ((error = E32_SetMode(origMode)) != E32_OK)
+		return error;
+
+	return E32_OK;
 }
 
 E32_STATUS E32_Reset()
 {
 	uint8_t message[] = {0xc4, 0xc4, 0xc4};
 	E32_STATUS error;
+
+	if ((error = E32_SetMode(SLEEP_MODE)) != E32_OK)
+		return error;
 
 	if((error = E32_ConfigRequest(message,3,NULL,0)) != E32_OK)
 		return error;
@@ -207,47 +219,51 @@ E32_STATUS E32_Reset()
 
 E32_STATUS E32_SaveParams()
 {
-	uint8_t config[6];
 	E32_STATUS error;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
+
+	_currentConfig[0] = '\xc0';
+
+	if((error=E32_ConfigRequest(_currentConfig,6,NULL,0))!=E32_OK)
 		return error;
 
-	if((error=E32_ConfigRequest(config,6,NULL,0))!=E32_OK)
+	return E32_OK;
+}
+
+E32_STATUS E32_SetParams()
+{
+	E32_STATUS error;
+
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
+
+	_currentConfig[0] = '\xc2';
+
+	if((error=E32_ConfigRequest(_currentConfig,6,NULL,0))!=E32_OK)
 		return error;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetAddress(uint16_t addr) {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	config[0] = 0xc2;
-	config[1] = (addr & 0xff00) >> 8;
-	config[2] = addr & 0xff;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[1] = (addr & 0xff00) >> 8;
+	_currentConfig[2] = addr & 0xff;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetParity(enum uartParity parity) {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	config[0] = 0xc2;
-	config[3] = (config[3] & 0x3f) | parity << 6;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[3] = (_currentConfig[3] & 0x3f) | parity << 6;
 
 	return E32_OK;
 
@@ -255,133 +271,86 @@ E32_STATUS E32_SetParity(enum uartParity parity) {
 
 E32_STATUS E32_SetUartBaud(enum uartBaud baud)
 {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	if (E32_GetMode() != SLEEP_MODE) {
+		_huart->Init.BaudRate = _baudRateList[baud];
+		HAL_UART_Init(_huart);
+		return E32_OK;
+	}
 
-	config[0] = 0xc2;
-	config[3] = (config[3] & 0xc7) | baud << 3;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[3] = (_currentConfig[3] & 0xc7) | baud << 3;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetAirRate(enum airRate rate)
 {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
-
-	config[0] = 0xc2;
-	config[3] = (config[3] & 0xF8) | rate;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[3] = (_currentConfig[3] & 0xF8) | rate;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetChannel(uint8_t channel)
 {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
-
-	config[0] = 0xc2;
-	config[4] = channel & 0x1F;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[4] = channel & 0x1F;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetTransmissionMode(enum txMode mode)
 {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	_currentConfig[5] = (_currentConfig[5] & 0x7F) | mode << 7;
 
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0x7F) | mode << 7;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetIOMode(enum ioMode mode)
 {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	_currentConfig[5] = (_currentConfig[5] & 0xBF) | mode << 6;
 
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0xBF) | mode << 6;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetWakeTime(enum wakeupTime wake) {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0xC7) | wake << 3;
+	_currentConfig[5] = (_currentConfig[5] & 0xC7) | wake << 3;
 
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetFECSwitch(enum fecSwitch fec) {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
+	_currentConfig[5] = (_currentConfig[5] & 0xFB) | fec << 2;
 
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0xFB) | fec << 2;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
 
 	return E32_OK;
 }
 
 E32_STATUS E32_SetTXPower(enum txPower power) {
-	uint8_t config[6], resp[6];
-	E32_STATUS error;
+	if (E32_GetMode() != SLEEP_MODE)
+		return E32_INVALID_MODE;
 
-	if((error=E32_GetConfig(config)) != E32_OK)
-		return error;
-
-	config[0] = 0xc2;
-	config[5] = (config[5] & 0xFC) | power;
-
-	if ((error=E32_ConfigRequest(config, 6 , resp, 6)) != E32_OK)
-		return error;
+	_currentConfig[5] = (_currentConfig[5] & 0xFC) | power;
 
 	return E32_OK;
 }
@@ -399,6 +368,9 @@ E32_STATUS E32_SetTargetAddress(uint8_t addr) {
 }
 
 E32_STATUS E32_Transmit(uint8_t *message, uint16_t length) {
+	if (E32_GetMode() == SLEEP_MODE)
+		return E32_INVALID_MODE;
+
 	if (length > 512)
 		return E32_MESSAGE_TOO_LONG;
 
@@ -421,16 +393,18 @@ E32_STATUS E32_Transmit(uint8_t *message, uint16_t length) {
 }
 
 uint16_t E32_ReceiveData(uint8_t *buffer, uint16_t bufferLength) {
+	if (E32_GetMode() == SLEEP_MODE)
+		return E32_INVALID_MODE;
+
 	_dataAvailable = 0;
 	uint16_t idx = -1;
 	uint8_t status;
-	printf("baud %ld\r\n",_huart->Init.BaudRate);
+
 	while((status=HAL_UART_Receive(_huart, &buffer[++idx], 1, 100))==HAL_OK) {
 		if (idx==bufferLength)
 			break;
 	}
 
-	printf("Status %d idx %d \r\n",status,idx);
 	return idx - 1;
 }
 
@@ -438,32 +412,10 @@ uint8_t E32_DataAvailable(void) {
 	return _dataAvailable;
 }
 
-void E32_Poll()
-{
-
-
-	E32_SetUartBaud(Baud_9600);
-	  uint8_t recv[] = {0x01,0x02,0x03,0x04,0x05,0x06};
-	  printf("----------\r\n");
-	  E32_STATUS status= E32_GetConfig(recv);
-	  printf("============\r\n");
-	  printf("%x - %x %x %x %x %x %x\r\n",status,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
-
-	  status = E32_Reset();
-	  printf("Reset %x\r\n",status);
-	  //E32_SetMode(3);
-	  //uint8_t send[] = {0xc1,0xc1,0xc1};
-	  //HAL_UART_Transmit(huart, send, 3, 2000);
-	  //HAL_StatusTypeDef status2 = HAL_UART_Receive(huart, recv, 6, 2000);
-	  //E32_STATUS status2 = E32_ConfigResponse(recv,6);
-	  //printf(">>>%x - %x %x %x %x %x %x\r\n",status2,recv[0],recv[1],recv[2],recv[3],recv[4],recv[5]);
-
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-//	printf("i %d\r\n",_disableAuxIrq);
+
 	if ((GPIO_Pin == AUX_Pin) & (!_disableAuxIrq)) {
-//		printf("irq\r\n");
 		_dataAvailable=1;
 	}
 }

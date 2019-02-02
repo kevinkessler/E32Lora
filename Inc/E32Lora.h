@@ -18,6 +18,7 @@
 #define E32_TIMEOUT 1
 #define E32_ERROR 100
 #define E32_MESSAGE_TOO_LONG 101
+#define E32_INVALID_MODE 102
 
 typedef uint8_t E32_STATUS;
 
@@ -89,6 +90,7 @@ E32_STATUS E32_GetConfig(uint8_t *configBuffer);
 E32_STATUS E32_GetVersion(uint8_t *configBuffer);
 E32_STATUS E32_Reset(void);
 E32_STATUS E32_SaveParams(void);
+E32_STATUS E32_SetParams(void);
 E32_STATUS E32_SetAddress(uint16_t addr);
 E32_STATUS E32_SetParity(enum uartParity parity);
 E32_STATUS E32_SetUartBaud(enum uartBaud baud);
